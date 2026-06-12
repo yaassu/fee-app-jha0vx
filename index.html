@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="月謝管理">
+<meta name="theme-color" content="#2e7d32">
+<title>少年野球 月謝管理</title>
+<style>
+  :root {
+    --green: #2e7d32;
+    --green-dark: #1b5e20;
+    --green-light: #e8f5e9;
+    --red: #c62828;
+    --red-light: #ffebee;
+    --gray: #757575;
+    --gray-light: #f5f5f5;
+    --border: #ddd;
+  }
+  * { box-sizing: border-box; }
+  button, td.cell { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
+    margin: 0;
+    background: #fafafa;
+    color: #212121;
+  }
+  header {
+    background: var(--green);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; margin: 0; flex: 1; }
+  header .team-name {
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.4);
+    border-radius: 6px;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 14px;
+    width: 220px;
+  }
+  header .team-name::placeholder { color: rgba(255,255,255,.7); }
+
+  nav {
+    display: flex;
+    background: #fff;
+    border-bottom: 2px solid var(--border);
+    overflow-x: auto;
+  }
+  nav button {
+    border: none;
+    background: none;
+    padding: 12px 22px;
+    font-size: 15px;
+    cursor: pointer;
+    color: var(--gray);
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+  nav button.active {
+    color: var(--green-dark);
+    font-weight: bold;
+    border-bottom-color: var(--green);
+  }
+  main { padding: 16px; max-width: 1100px; margin: 0 auto; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  /* 集計カード */
+  .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 150px;
+    flex: 1;
+  }
+  .card .label { font-size: 12px; color: var(--gray); }
+  .card .value { font-size: 24px; font-weight: bold; margin-top: 4px; }
+  .card .value small { font-size: 13px; font-weight: normal; color: var(--gray); }
+  .card.alert .value { color: var(--red); }
+
+  /* 年度セレクタ */
+  .year-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .year-bar button {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .year-bar .year-label { font-size: 18px; font-weight: bold; }
+  .hint { font-size: 12px; color: var(--gray); margin-left: auto; }
+
+  /* 納入表 */
+  .table-wrap { overflow-x: auto; background: #fff; border: 1px solid var(--border); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { border: 1px solid #eee; padding: 6px 8px; text-align: center; white-space: nowrap; }
+  thead th { background: var(--green-light); color: var(--green-dark); position: sticky; top: 0; }
+  th.name-col, td.name-col {
+    text-align: left;
+    position: sticky;
+    left: 0;
+    background: #fff;
+    min-width: 130px;
+    z-index: 1;
+  }
+  thead th.name-col { background: var(--green-light); z-index: 2; }
+  td.cell { cursor: pointer; user-select: none; min-width: 52px; }
+  td.cell:hover { outline: 2px solid var(--green); outline-offset: -2px; }
+  td.paid { background: var(--green-light); color: var(--green-dark); font-weight: bold; }
+  td.unpaid { background: var(--red-light); color: var(--red); }
+  td.exempt { background: var(--gray-light); color: var(--gray); }
+  td.future { background: #fff; color: #ccc; }
+  tfoot td { background: #fffde7; font-weight: bold; font-size: 12px; }
+  .member-info { font-size: 11px; color: var(--gray); font-weight: normal; }
+
+  .legend { display: flex; gap: 16px; margin: 10px 2px; font-size: 13px; color: #424242; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .chip { display: inline-block; width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border); }
+  .chip.p { background: var(--green-light); }
+  .chip.u { background: var(--red-light); }
+  .chip.e { background: var(--gray-light); }
+
+  /* 未納者リスト */
+  .unpaid-list { margin-top: 16px; }
+  .unpaid-list h3 { font-size: 15px; margin: 0 0 8px; }
+  .unpaid-item {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--red);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .unpaid-item .months { font-size: 13px; color: var(--red); }
+  .all-paid { color: var(--green-dark); background: var(--green-light); padding: 10px 14px; border-radius: 8px; }
+
+  /* フォーム・部員管理 */
+  .panel { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .panel h2 { font-size: 16px; margin: 0 0 12px; color: var(--green-dark); }
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--gray); }
+  input[type="text"], input[type="number"], select {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 16px; /* 16px未満だとiOSでフォーカス時に画面が拡大されてしまう */
+  }
+  .btn {
+    border: none;
+    border-radius: 6px;
+    padding: 9px 18px;
+    font-size: 14px;
+    cursor: pointer;
+    background: var(--green);
+    color: #fff;
+  }
+  .btn:hover { background: var(--green-dark); }
+  .btn.secondary { background: #fff; color: var(--green-dark); border: 1px solid var(--green); }
+  .btn.danger { background: #fff; color: var(--red); border: 1px solid var(--red); }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+
+  .member-table th { background: var(--green-light); color: var(--green-dark); }
+  .member-table td { text-align: left; }
+  .member-table td.actions { text-align: right; white-space: nowrap; }
+
+  .empty { color: var(--gray); padding: 20px; text-align: center; }
+
+  /* 表示切り替え（月別集金 / 年間一覧） */
+  .view-toggle {
+    display: flex;
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    overflow: hidden;
+    width: fit-content;
+    margin-bottom: 14px;
+  }
+  .view-toggle button {
+    border: none;
+    background: #fff;
+    color: var(--green-dark);
+    padding: 10px 22px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .view-toggle button.active { background: var(--green); color: #fff; font-weight: bold; }
+
+  /* 月別集金ビュー */
+  .month-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    max-width: 420px;
+  }
+  .month-bar button {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .month-label { font-size: 18px; font-weight: bold; flex: 1; text-align: center; }
+  .month-list-item {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .month-list-item .info { flex: 1; min-width: 0; }
+  .month-list-item .info b { font-size: 16px; }
+  .status-btn {
+    min-width: 92px;
+    padding: 13px 0;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: bold;
+    border: 1px solid;
+    cursor: pointer;
+  }
+  .status-btn.paid { background: var(--green-light); color: var(--green-dark); border-color: var(--green); }
+  .status-btn.unpaid { background: var(--red-light); color: var(--red); border-color: var(--red); }
+  .status-btn.exempt { background: var(--gray-light); color: var(--gray); border-color: var(--gray); }
+
+  /* スマートフォン向け */
+  @media (max-width: 600px) {
+    header { padding: 12px 14px; }
+    header h1 { font-size: 17px; }
+    header .team-name { width: 130px; flex: 1; }
+    nav button { flex: 1; padding: 12px 8px; font-size: 14px; }
+    main { padding: 10px; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .card { min-width: 0; padding: 10px 12px; }
+    .card .value { font-size: 19px; }
+    .view-toggle { width: 100%; }
+    .view-toggle button { flex: 1; }
+    .year-bar { flex-wrap: nowrap; }
+    .year-bar .year-label { flex: 1; text-align: center; font-size: 16px; }
+    .month-bar { max-width: none; }
+    .hint { display: none; }
+    th, td { padding: 8px 6px; }
+    td.cell { min-width: 44px; height: 44px; }
+    .form-row { flex-direction: column; align-items: stretch; }
+    .form-row .field input, .form-row .field select { width: 100% !important; }
+    .btn { padding: 12px 18px; }
+    .member-table td.actions .btn { padding: 8px 10px; }
+  }
+  footer { text-align: center; color: #bbb; font-size: 12px; padding: 20px; }
+
+  @media print {
+    header .team-name { border: none; }
+    nav, .legend, .hint, .year-bar button, .view-toggle, .month-bar button, footer { display: none; }
+    main { max-width: none; padding: 0; }
+    .table-wrap { border: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚾ 月謝管理</h1>
+  <input class="team-name" id="teamName" type="text" placeholder="チーム名を入力">
+</header>
+
+<nav>
+  <button class="active" data-tab="sheet">納入表</button>
+  <button data-tab="members">部員管理</button>
+  <button data-tab="data">データ管理</button>
+</nav>
+
+<main>
+  <!-- ===== 納入表タブ ===== -->
+  <section id="tab-sheet" class="tab active">
+    <div class="view-toggle">
+      <button id="viewMonthBtn">月別集金</button>
+      <button id="viewYearBtn">年間一覧</button>
+    </div>
+
+    <div class="cards" id="summaryCards"></div>
+
+    <!-- 月別集金ビュー（スマホ向け） -->
+    <div id="monthView">
+      <div class="month-bar">
+        <button id="prevMonth">◀</button>
+        <span class="month-label" id="monthLabel"></span>
+        <button id="nextMonth">▶</button>
+      </div>
+      <div id="monthList"></div>
+    </div>
+
+    <!-- 年間一覧ビュー -->
+    <div id="yearView">
+      <div class="year-bar">
+        <button id="prevYear">◀</button>
+        <span class="year-label" id="yearLabel"></span>
+        <button id="nextYear">▶</button>
+        <span class="hint">セルをクリックすると「未納 → 済 → 免除」の順に切り替わります</span>
+      </div>
+
+      <div class="table-wrap">
+        <table id="sheetTable"></table>
+      </div>
+
+      <div class="legend">
+        <span><span class="chip p"></span> 納入済</span>
+        <span><span class="chip u"></span> 未納</span>
+        <span><span class="chip e"></span> 免除</span>
+        <span style="margin-left:auto"><button class="btn secondary small" onclick="window.print()">印刷</button></span>
+      </div>
+    </div>
+
+    <div class="unpaid-list" id="unpaidList"></div>
+  </section>
+
+  <!-- ===== 部員管理タブ ===== -->
+  <section id="tab-members" class="tab">
+    <div class="panel">
+      <h2>部員を追加</h2>
+      <div class="form-row">
+        <div class="field">
+          <label>名前 *</label>
+          <input type="text" id="newName" placeholder="例：山田 太郎" style="width:180px">
+        </div>
+        <div class="field">
+          <label>学年</label>
+          <select id="newGrade">
+            <option value="">未設定</option>
+            <option>年長</option>
+            <option>1年</option><option>2年</option><option>3年</option>
+            <option>4年</option><option>5年</option><option>6年</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>月謝（円）</label>
+          <input type="number" id="newFee" value="3000" min="0" step="100" style="width:110px">
+        </div>
+        <button class="btn" id="addMemberBtn">追加</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>部員一覧</h2>
+      <div class="table-wrap" style="border:none">
+        <table class="member-table" id="memberTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== データ管理タブ ===== -->
+  <section id="tab-data" class="tab">
+    <div class="panel">
+      <h2>エクスポート</h2>
+      <p style="font-size:13px;color:var(--gray)">納入表をExcelで開けるCSV形式で保存したり、全データのバックアップが作れます。</p>
+      <div class="form-row">
+        <button class="btn secondary" id="exportCsvBtn">納入表をCSVで保存</button>
+        <button class="btn secondary" id="exportJsonBtn">バックアップを保存（JSON）</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>バックアップから復元</h2>
+      <p style="font-size:13px;color:var(--gray)">保存したJSONファイルを選ぶと、現在のデータを置き換えて復元します。</p>
+      <input type="file" id="importFile" accept=".json">
+    </div>
+    <div class="panel">
+      <h2>データの保存場所について</h2>
+      <p style="font-size:13px;color:#424242;line-height:1.7">
+        データはこのパソコンのブラウザ内に自動保存されます。入力のたびに保存されるので「保存ボタン」は不要です。<br>
+        ただしブラウザの履歴・サイトデータを削除すると消えてしまうため、<b>定期的にバックアップ（JSON）を保存しておくことをおすすめします。</b>
+      </p>
+      <button class="btn danger" id="clearAllBtn">全データを削除</button>
+    </div>
+  </section>
+</main>
+
+<footer>少年野球 月謝管理アプリ</footer>
+
+<script>
+'use strict';
+
+const STORAGE_KEY = 'baseball-fee-app';
+
+// ===== データ =====
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* 壊れていたら初期化 */ }
+  return { teamName: '', members: [], payments: {} };
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ===== 年度（4月始まり） =====
+const today = new Date();
+let fiscalYear = today.getMonth() + 1 >= 4 ? today.getFullYear() : today.getFullYear() - 1;
+
+// 年度内の12ヶ月分の {y, m} を返す（4月〜翌3月）
+function fiscalMonths(fy) {
+  const list = [];
+  for (let m = 4; m <= 12; m++) list.push({ y: fy, m });
+  for (let m = 1; m <= 3; m++) list.push({ y: fy + 1, m });
+  return list;
+}
+function ym(y, m) { return y + '-' + String(m).padStart(2, '0'); }
+function payKey(memberId, y, m) { return memberId + ':' + ym(y, m); }
+function isFuture(y, m) {
+  return y > today.getFullYear() || (y === today.getFullYear() && m > today.getMonth() + 1);
+}
+
+// ===== タブ切り替え =====
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ===== チーム名 =====
+const teamNameInput = document.getElementById('teamName');
+teamNameInput.value = state.teamName || '';
+teamNameInput.addEventListener('input', () => {
+  state.teamName = teamNameInput.value;
+  save();
+  document.title = (state.teamName ? state.teamName + ' ' : '') + '月謝管理';
+});
+document.title = (state.teamName ? state.teamName + ' ' : '') + '月謝管理';
+
+// ===== 年度切り替え =====
+document.getElementById('prevYear').addEventListener('click', () => { fiscalYear--; renderSheet(); });
+document.getElementById('nextYear').addEventListener('click', () => { fiscalYear++; renderSheet(); });
+
+// ===== 表示切り替え（月別集金 / 年間一覧） =====
+// スマホでは月別集金、広い画面では年間一覧を最初に表示
+let view = window.matchMedia('(max-width: 600px)').matches ? 'month' : 'year';
+let selMonth = { y: today.getFullYear(), m: today.getMonth() + 1 };
+
+function setView(v) {
+  view = v;
+  document.getElementById('monthView').style.display = v === 'month' ? '' : 'none';
+  document.getElementById('yearView').style.display = v === 'year' ? '' : 'none';
+  document.getElementById('viewMonthBtn').classList.toggle('active', v === 'month');
+  document.getElementById('viewYearBtn').classList.toggle('active', v === 'year');
+}
+document.getElementById('viewMonthBtn').addEventListener('click', () => setView('month'));
+document.getElementById('viewYearBtn').addEventListener('click', () => setView('year'));
+
+// ===== 月切り替え =====
+document.getElementById('prevMonth').addEventListener('click', () => {
+  selMonth.m--;
+  if (selMonth.m === 0) { selMonth.m = 12; selMonth.y--; }
+  renderSheet();
+});
+document.getElementById('nextMonth').addEventListener('click', () => {
+  selMonth.m++;
+  if (selMonth.m === 13) { selMonth.m = 1; selMonth.y++; }
+  renderSheet();
+});
+
+// ===== 納入表の描画 =====
+function renderSheet() {
+  document.getElementById('yearLabel').textContent = fiscalYear + '年度（4月〜翌3月）';
+  renderSummary();
+  renderMonthList();
+  renderTable();
+  renderUnpaidList();
+}
+
+function renderSummary() {
+  const y = selMonth.y, m = selMonth.m;
+  const active = state.members;
+  let paidCount = 0, exemptCount = 0, collected = 0, expected = 0;
+  active.forEach(mem => {
+    const p = state.payments[payKey(mem.id, y, m)];
+    if (p && p.status === 'paid') { paidCount++; collected += p.amount ?? mem.fee; }
+    else if (p && p.status === 'exempt') { exemptCount++; }
+    if (!p || p.status !== 'exempt') expected += mem.fee;
+  });
+  const target = active.length - exemptCount;
+  const unpaidCount = target - paidCount;
+  const rate = target > 0 ? Math.round(paidCount / target * 100) : 0;
+
+  const cards = [
+    { label: '部員数', value: active.length + ' <small>人</small>' },
+    { label: m + '月の納入率', value: rate + ' <small>%（' + paidCount + '/' + target + '人）</small>' },
+    { label: m + '月の未納', value: unpaidCount + ' <small>人</small>', alert: unpaidCount > 0 },
+    { label: m + '月の集金額', value: collected.toLocaleString() + ' <small>円 / ' + expected.toLocaleString() + '円</small>' },
+  ];
+  document.getElementById('summaryCards').innerHTML = cards.map(c =>
+    '<div class="card' + (c.alert ? ' alert' : '') + '"><div class="label">' + c.label + '</div><div class="value">' + c.value + '</div></div>'
+  ).join('');
+}
+
+function renderMonthList() {
+  document.getElementById('monthLabel').textContent = selMonth.y + '年' + selMonth.m + '月';
+  const el = document.getElementById('monthList');
+
+  if (state.members.length === 0) {
+    el.innerHTML = '<div class="empty">「部員管理」タブから部員を追加してください</div>';
+    return;
+  }
+
+  el.innerHTML = state.members.map(mem => {
+    const p = state.payments[payKey(mem.id, selMonth.y, selMonth.m)];
+    const status = p ? p.status : 'unpaid';
+    const label = status === 'paid' ? '済' : status === 'exempt' ? '免除' : '未納';
+    const date = p && p.status === 'paid' && p.date
+      ? '<div class="member-info">納入日: ' + p.date + '</div>' : '';
+    return '<div class="month-list-item">' +
+      '<div class="info"><b>' + esc(mem.name) + '</b>' +
+      '<div class="member-info">' + esc(mem.grade || '') + (mem.grade ? '・' : '') + mem.fee.toLocaleString() + '円</div>' +
+      date + '</div>' +
+      '<button class="status-btn ' + status + '" data-id="' + mem.id + '">' + label + '</button>' +
+      '</div>';
+  }).join('');
+
+  el.querySelectorAll('.status-btn').forEach(btn => {
+    btn.addEventListener('click', () => cycleStatus(btn.dataset.id, selMonth.y, selMonth.m));
+  });
+}
+
+function renderTable() {
+  const months = fiscalMonths(fiscalYear);
+  const table = document.getElementById('sheetTable');
+
+  if (state.members.length === 0) {
+    table.innerHTML = '<tr><td class="empty">「部員管理」タブから部員を追加してください</td></tr>';
+    return;
+  }
+
+  let html = '<thead><tr><th class="name-col">名前</th>';
+  months.forEach(({ m }) => { html += '<th>' + m + '月</th>'; });
+  html += '<th>納入額計</th></tr></thead><tbody>';
+
+  state.members.forEach(mem => {
+    let total = 0;
+    html += '<tr><td class="name-col">' + esc(mem.name) +
+      '<div class="member-info">' + esc(mem.grade || '') + (mem.grade ? '・' : '') + mem.fee.toLocaleString() + '円</div></td>';
+    months.forEach(({ y, m }) => {
+      const p = state.payments[payKey(mem.id, y, m)];
+      const status = p ? p.status : 'unpaid';
+      let cls = 'cell ', text = '';
+      if (status === 'paid') { cls += 'paid'; text = '済'; total += p.amount ?? mem.fee; }
+      else if (status === 'exempt') { cls += 'exempt'; text = '免'; }
+      else if (isFuture(y, m)) { cls += 'future'; text = '−'; }
+      else { cls += 'unpaid'; text = '未'; }
+      const title = p && p.status === 'paid' && p.date ? '納入日: ' + p.date : '';
+      html += '<td class="' + cls + '" data-id="' + mem.id + '" data-y="' + y + '" data-m="' + m + '" title="' + title + '">' + text + '</td>';
+    });
+    html += '<td><b>' + total.toLocaleString() + '</b><span class="member-info">円</span></td></tr>';
+  });
+  html += '</tbody><tfoot><tr><td class="name-col">月別集金額</td>';
+
+  let grand = 0;
+  months.forEach(({ y, m }) => {
+    let sum = 0;
+    state.members.forEach(mem => {
+      const p = state.payments[payKey(mem.id, y, m)];
+      if (p && p.status === 'paid') sum += p.amount ?? mem.fee;
+    });
+    grand += sum;
+    html += '<td>' + (sum > 0 ? sum.toLocaleString() : '') + '</td>';
+  });
+  html += '<td>' + grand.toLocaleString() + '円</td></tr></tfoot>';
+
+  table.innerHTML = html;
+
+  table.querySelectorAll('td.cell').forEach(td => {
+    td.addEventListener('click', () => {
+      const { id, y, m } = td.dataset;
+      cycleStatus(id, Number(y), Number(m));
+    });
+  });
+}
+
+// 未納 → 済 → 免除 → 未納
+function cycleStatus(memberId, y, m) {
+  const key = payKey(memberId, y, m);
+  const mem = state.members.find(x => x.id === memberId);
+  const cur = state.payments[key];
+  if (!cur || cur.status === 'unpaid') {
+    state.payments[key] = {
+      status: 'paid',
+      amount: mem ? mem.fee : 0,
+      date: new Date().toLocaleDateString('ja-JP'),
+    };
+  } else if (cur.status === 'paid') {
+    state.payments[key] = { status: 'exempt' };
+  } else {
+    delete state.payments[key];
+  }
+  save();
+  renderSheet();
+}
+
+function renderUnpaidList() {
+  const el = document.getElementById('unpaidList');
+  const months = fiscalMonths(fiscalYear).filter(({ y, m }) => !isFuture(y, m));
+  const items = [];
+
+  state.members.forEach(mem => {
+    const unpaidMonths = months.filter(({ y, m }) => {
+      const p = state.payments[payKey(mem.id, y, m)];
+      return !p || p.status === 'unpaid';
+    });
+    if (unpaidMonths.length > 0) {
+      const amount = unpaidMonths.length * mem.fee;
+      items.push(
+        '<div class="unpaid-item"><b>' + esc(mem.name) + '</b>' +
+        '<span class="months">' + unpaidMonths.map(({ m }) => m + '月').join('、') +
+        '（計 ' + amount.toLocaleString() + '円）</span></div>'
+      );
+    }
+  });
+
+  if (state.members.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = '<h3>未納者一覧（' + fiscalYear + '年度）</h3>' +
+    (items.length ? items.join('') : '<div class="all-paid">🎉 全員納入済みです！</div>');
+}
+
+// ===== 部員管理 =====
+document.getElementById('addMemberBtn').addEventListener('click', addMember);
+document.getElementById('newName').addEventListener('keydown', e => { if (e.key === 'Enter') addMember(); });
+
+function addMember() {
+  const name = document.getElementById('newName').value.trim();
+  const grade = document.getElementById('newGrade').value;
+  const fee = Number(document.getElementById('newFee').value) || 0;
+  if (!name) { alert('名前を入力してください'); return; }
+  state.members.push({ id: 'm' + Date.now() + Math.random().toString(36).slice(2, 6), name, grade, fee });
+  save();
+  document.getElementById('newName').value = '';
+  document.getElementById('newName').focus();
+  renderMembers();
+  renderSheet();
+}
+
+function renderMembers() {
+  const table = document.getElementById('memberTable');
+  if (state.members.length === 0) {
+    table.innerHTML = '<tr><td class="empty">まだ部員が登録されていません</td></tr>';
+    return;
+  }
+  let html = '<thead><tr><th>名前</th><th>学年</th><th>月謝</th><th></th></tr></thead><tbody>';
+  state.members.forEach((mem, i) => {
+    html += '<tr>' +
+      '<td>' + esc(mem.name) + '</td>' +
+      '<td>' + esc(mem.grade || '−') + '</td>' +
+      '<td>' + mem.fee.toLocaleString() + '円</td>' +
+      '<td class="actions">' +
+        '<button class="btn secondary small" data-act="up" data-i="' + i + '">↑</button> ' +
+        '<button class="btn secondary small" data-act="down" data-i="' + i + '">↓</button> ' +
+        '<button class="btn secondary small" data-act="edit" data-i="' + i + '">編集</button> ' +
+        '<button class="btn danger small" data-act="del" data-i="' + i + '">削除</button>' +
+      '</td></tr>';
+  });
+  table.innerHTML = html + '</tbody>';
+
+  table.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.i);
+      const mem = state.members[i];
+      const act = btn.dataset.act;
+      if (act === 'del') {
+        if (!confirm(mem.name + ' さんを削除しますか？\n納入記録も一緒に削除されます。')) return;
+        Object.keys(state.payments).forEach(k => { if (k.startsWith(mem.id + ':')) delete state.payments[k]; });
+        state.members.splice(i, 1);
+      } else if (act === 'edit') {
+        const name = prompt('名前', mem.name);
+        if (name === null) return;
+        const grade = prompt('学年（例：3年。空欄可）', mem.grade || '');
+        if (grade === null) return;
+        const fee = prompt('月謝（円）', mem.fee);
+        if (fee === null) return;
+        if (name.trim()) mem.name = name.trim();
+        mem.grade = grade.trim();
+        mem.fee = Number(fee) || mem.fee;
+      } else if (act === 'up' && i > 0) {
+        [state.members[i - 1], state.members[i]] = [state.members[i], state.members[i - 1]];
+      } else if (act === 'down' && i < state.members.length - 1) {
+        [state.members[i + 1], state.members[i]] = [state.members[i], state.members[i + 1]];
+      }
+      save();
+      renderMembers();
+      renderSheet();
+    });
+  });
+}
+
+// ===== データ管理 =====
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  const months = fiscalMonths(fiscalYear);
+  let csv = '名前,学年,月謝,' + months.map(({ m }) => m + '月').join(',') + ',納入額計\n';
+  state.members.forEach(mem => {
+    let total = 0;
+    const cells = months.map(({ y, m }) => {
+      const p = state.payments[payKey(mem.id, y, m)];
+      if (p && p.status === 'paid') { total += p.amount ?? mem.fee; return '済'; }
+      if (p && p.status === 'exempt') return '免除';
+      return isFuture(y, m) ? '' : '未納';
+    });
+    csv += [csvEsc(mem.name), csvEsc(mem.grade || ''), mem.fee, ...cells, total].join(',') + '\n';
+  });
+  // ExcelでUTF-8を正しく開くためのBOM付き
+  download(new Blob(['﻿' + csv], { type: 'text/csv' }), '月謝納入表_' + fiscalYear + '年度.csv');
+});
+
+document.getElementById('exportJsonBtn').addEventListener('click', () => {
+  download(new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }),
+    '月謝管理バックアップ_' + new Date().toISOString().slice(0, 10) + '.json');
+});
+
+document.getElementById('importFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.members) || typeof data.payments !== 'object') throw new Error();
+      if (!confirm('現在のデータをバックアップの内容で置き換えます。よろしいですか？')) return;
+      state = data;
+      save();
+      teamNameInput.value = state.teamName || '';
+      renderAll();
+      alert('復元しました（部員 ' + state.members.length + '人）');
+    } catch {
+      alert('ファイルを読み込めませんでした。このアプリで保存したJSONファイルを選んでください。');
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('clearAllBtn').addEventListener('click', () => {
+  if (!confirm('本当に全データを削除しますか？')) return;
+  if (!confirm('この操作は取り消せません。バックアップは保存しましたか？')) return;
+  state = { teamName: '', members: [], payments: {} };
+  save();
+  teamNameInput.value = '';
+  renderAll();
+});
+
+// ===== ユーティリティ =====
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function csvEsc(s) {
+  s = String(s);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function download(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function renderAll() {
+  renderSheet();
+  renderMembers();
+}
+setView(view);
+renderAll();
+</script>
+</body>
+</html>
